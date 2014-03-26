@@ -1,5 +1,6 @@
 import math
 from scipy.special import gammaln, hyp1f1, binom, hyp2f1
+import numpy as np
 
 EPS = 1e-6
 
@@ -150,7 +151,7 @@ def Q1vsM(k, m, t, mu, s, V):
     return Q(0, 1, k, m, t, mu, s, V) + Q(1, 1, m - k, m, t, mu, s, V)
 
 def Qvec(k1, m1, m2, t, mu, s, V):
-    ret = [0.0] * (m2 + 1)
+    ret = np.zeros(m2 + 1)
     uP = uLinkage(s, mu, V)
     uM = uLinkage(-s, mu, V)
     for k in xrange(0, m2 + 1):
@@ -164,33 +165,42 @@ def Q1vsMvec(m, t, mu, s, V):
         q1[k] += q2[m - k]
     return q1
 
-class IllegalParametersError(Exception):
-    def __init__(self, value):
-        self.value = value
-    def __str__(self):
-        return repr(self.value)
+# def 
+# auto neutral = c * Q1vsM(m, m, t, mu, 0, 0, 0);
+# auto neutralAndHH = c * Q1vsM(m, m, t, mu, 0, 0, V);
+# auto driftOnly = neutral * exp(-V);
+# auto hh = neutralAndHH - driftOnly;
+# 
+# auto selDrift = (1.0 - c) * cw * Q1vsM(m, m, t, mu, s, 0, 0);
+# auto selDriftAndHH = (1.0 - c) * cw * Q1vsM(m, m, t, mu, s, 0, V);
+# auto selHH = selDriftAndHH - selDrift;
+# 
+# auto adaptive = (1.0 - c) * (1.0 - cw) * 2.0 * gamma * t;
+# 
+# auto totalSubst = neutralAndHH + selDriftAndHH + adaptive;
+# 
+# auto driftLoad = selDrift * s;
+# auto hhLoad = selHH * s;
 
-class SingleSpectrumProb:
+class SpectrumProb:
     def __init__(self, m):
         self.m = m
         self.lastP = (0.0, 0.0, 0.0, 0.0)
-        self.last_prob = [0.0] * (m + 1)
+        self.last_prob = np.zeros(m + 1)
   
-    def __call__(t, mu, s, V):
+    def __call__(self, t, mu, s, V):
         if self.lastP != (t, mu, s, V):
             self.last_prob = self.prob(t, mu, s, V)
-            self.lastP = (t, mu, s, gamma, V)
-        return last_prob
+            self.lastP = (t, mu, s, V)
+        return self.last_prob
     
-    def prob(t, mu, s, V):
+    def prob(self, t, mu, s, V):
         if t < 0:
-            raise IllegalParametersError("t negative")
+            raise ValueError("t negative")
         if mu < 0:
-            raise IllegalParametersError("mu negative")
+            raise ValueError("mu negative")
         if s < 0:
-            raise IllegalParametersError("s negative")
-        if gamma < 0:
-            raise IllegalParametersError("gamma negative")
+            raise ValueError("s negative")
         if V < 0:
-            raise IllegalParametersError("V negative")
-        return Q1vsM(m, t, mu, s, V)
+            raise ValueError("V negative")
+        return Q1vsMvec(self.m, t, mu, s, V)
