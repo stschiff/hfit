@@ -11,16 +11,16 @@ immutable static double penalty = 1.0e20;
 class SingleSpectrumScore {
   SingleSpectrumProb neutralSpectrumProbFunc;
   SingleSpectrumProb selectedSpectrumProbFunc;
-  const(int[]) spectrumData;
-  int m;
-  int norm;
-  int nrParams;
+  const(ulong[]) spectrumData;
+  ulong m;
+  ulong norm;
+  ubyte nrParams;
   
-  this(in int[] spectrumData, int nrParams) {
+  this(in ulong[] spectrumData, ubyte nrParams) {
     enforce(spectrumData.length > 0, "need non-empty data");
-    m = cast(int)spectrumData.length - 1;
-    neutralSpectrumProbFunc = new SingleSpectrumProb(m);
-    selectedSpectrumProbFunc = new SingleSpectrumProb(m);
+    m = spectrumData.length - 1;
+    neutralSpectrumProbFunc = new SingleSpectrumProb(cast(int)m);
+    selectedSpectrumProbFunc = new SingleSpectrumProb(cast(int)m);
     norm = reduce!"a+b"(spectrumData.dup);
     this.spectrumData = spectrumData;
     this.nrParams = nrParams;
@@ -107,7 +107,7 @@ class SingleSpectrumScore {
 
 class FullScore : SingleSpectrumScore {
   
-  this(in int[] spectrum) {
+  this(in ulong[] spectrum) {
     super(spectrum, 7);
   }
   
@@ -162,7 +162,7 @@ class FullScore : SingleSpectrumScore {
 
 class DriverfieldNeutralScoreSel : SingleSpectrumScore {
 
-  this(in int[] spectrum) {
+  this(in ulong[] spectrum) {
     super(spectrum, 4);
   }
   
@@ -202,7 +202,7 @@ class DriverfieldNeutralScoreSel : SingleSpectrumScore {
 
 class DriverfieldNeutralScore : SingleSpectrumScore {
 
-  this(in int[] spectrum) {
+  this(in ulong[] spectrum) {
     super(spectrum, 3);
   }
   
@@ -239,7 +239,7 @@ class DriverfieldNeutralScore : SingleSpectrumScore {
 
 class UnlinkedNeutralScoreSel : SingleSpectrumScore {
   
-  this(in int[] spectrum) {
+  this(in ulong[] spectrum) {
     super(spectrum, 3);
   }
   
@@ -277,7 +277,7 @@ class UnlinkedNeutralScoreSel : SingleSpectrumScore {
 
 class UnlinkedNeutralScore : SingleSpectrumScore {
   
-  this(in int[] spectrum) {
+  this(in ulong[] spectrum) {
     super(spectrum, 2);
   }
   
@@ -313,7 +313,7 @@ class ConstrainedNonNeutralScore : SingleSpectrumScore {
   
   double[string] params;
   
-  this(in int[] spectrum, double mu, double V, double t) {
+  this(in ulong[] spectrum, double mu, double V, double t) {
     super(spectrum, 4);
     params["mu"] = mu;
     params["V"] = V;
