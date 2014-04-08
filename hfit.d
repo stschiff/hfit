@@ -141,8 +141,6 @@ void writeParamsWithBootstrap(SingleSpectrumScore scoreFunc, in double[] xMin, i
     auto p = scoreFunc.makeSingleSpectrumParams(xMin);
     auto accMean = accumulator.mean();
     auto accStddev = accumulator.stddev();
-    stderr.writeln("accumulator.mean: ", accMean);
-    stderr.writeln("accumulator.stddev: ", accStddev);
     auto paramNames = scoreFunc.paramNames();
     auto pBSmean = scoreFunc.makeSingleSpectrumParams(accMean);
     auto pBSstddev = pBSmean.dup;
@@ -151,8 +149,6 @@ void writeParamsWithBootstrap(SingleSpectrumScore scoreFunc, in double[] xMin, i
     foreach(i, param; paramNames) {
         pBSstddev[param] = accStddev[i];
     }
-    stderr.writeln("pBSmean:", pBSmean);
-    stderr.writeln("pBSstddev:", pBSstddev);
     auto substLoadMean = substLoadAccumulator.mean();
     auto substLoadStddev = substLoadAccumulator.stddev();
     
