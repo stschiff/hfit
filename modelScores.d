@@ -309,13 +309,13 @@ class UnlinkedNeutralScore : SingleSpectrumScore {
 
 class ConstrainedNonNeutralScore : SingleSpectrumScore {
   
-  double[string] params;
+  double mu, V, t;
   
   this(in ulong[] spectrum, double mu, double V, double t) {
     super(spectrum, 4);
-    params["mu"] = mu;
-    params["V"] = V;
-    params["t"] = t;
+    this.mu = mu;
+    this.V = V;
+    this.t = t;
   }
   
   override void checkParams(double[string] p) {
@@ -333,6 +333,10 @@ class ConstrainedNonNeutralScore : SingleSpectrumScore {
     auto c = x[1];
     auto s = x[2];
     auto cw = x[3];
+    double[string] params;
+    params["mu"] = mu;
+    params["V"] = V;
+    params["t"] = t;
     params["gamma"] = gamma;
     params["c"] = c;
     params["s"] = s;

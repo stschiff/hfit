@@ -139,10 +139,18 @@ void writeParams(SingleSpectrumScore scoreFunc, in double[] x, in double[] subst
 void writeParamsWithBootstrap(SingleSpectrumScore scoreFunc, in double[] xMin, in double[] substLoadStats,
                               Accumulator accumulator, Accumulator substLoadAccumulator) {
     auto p = scoreFunc.makeSingleSpectrumParams(xMin);
-    stderr.writeln("accumulator.mean: ", accumulator.mean());
-    stderr.writeln("accumulator.stddev: ", accumulator.stddev());
-    auto pBSmean = scoreFunc.makeSingleSpectrumParams(accumulator.mean());
-    auto pBSstddev = scoreFunc.makeSingleSpectrumParams(accumulator.stddev());
+    auto accMean = accumulator.mean();
+    auto accStddev = accumulator.stddev();
+    stderr.writeln("accumulator.mean: ", accMean);
+    stderr.writeln("accumulator.stddev: ", accStddev);
+    auto paramNames = scoreFunc.paramNames();
+    auto pBSmean = scoreFunc.makeSingleSpectrumParams(accMean);
+    auto pBSstddev = pBSmean.dup;
+    foreach(key, ref val; pBSstddev)
+        val = 0.0;
+    foreach(i, param; paramNames) {
+        pBSstddev[param] = accStddev[i];
+    }
     stderr.writeln("pBSmean:", pBSmean);
     stderr.writeln("pBSstddev:", pBSstddev);
     auto substLoadMean = substLoadAccumulator.mean();
@@ -229,10 +237,10 @@ class Accumulator {
     }
   
     double[] mean() const {
-        return iota(nrParams).map!(i => sums[i] / norm)().array;
+        return iota(nrParams).map!(i => sums[i] / norm)().array.dup;
     }
     
     double[] stddev() const {
-        return iota(nrParams).map!(i => sqrt(sums_sq[i] / norm - (sums[i] / norm)^^2))().array;
+        return iota(nrParams).map!(i => sqrt(max(sums_sq[i] / norm - (sums[i] / norm)^^2, 0.0)))().array.dup;
     }
 }
