@@ -66,21 +66,27 @@ void run() {
     auto scoreFunc = getScoreFunc(spectrum, model);
     
     auto xMin = getMinimum(scoreFunc);
+    stderr.writeln("params: ", xMin);
+    auto substLoadStats = getSubstAndLoadStats(scoreFunc, xMin);
     
     if(noBootstrap) {
-        writeParams(scoreFunc, xMin);
+        writeParams(scoreFunc, xMin, substLoadStats);
     }
     else {
         auto accumulator = new Accumulator(scoreFunc.nrParams);
+        auto substLoadAccumulator = new Accumulator(7);
         foreach(i; 0 .. nrBootStrapSamples) {
             stderr.writefln("Bootstrap sample %s", i);
             auto bootstrapSpectrum = getBootstrap(spectrum);
             writeln("bootstrap spectrum: ", bootstrapSpectrum);
             auto bootstrapScoreFunc = getScoreFunc(bootstrapSpectrum, model);
             auto xMinBootstrap = getMinimum(bootstrapScoreFunc);
+            stderr.writeln("params: ", xMinBootstrap);
+            auto substLoadStatsBS = getSubstAndLoadStats(bootstrapScoreFunc, xMinBootstrap);
             accumulator.add(xMinBootstrap);
+            substLoadAccumulator.add(substLoadStatsBS);
         }
-        writeParamsWithBootstrap(scoreFunc, xMin, accumulator);
+        writeParamsWithBootstrap(scoreFunc, xMin, substLoadStats, accumulator, substLoadAccumulator);
     }
 }  
 
@@ -116,30 +122,41 @@ double[] getMinimum(SingleSpectrumScore scoreFunc) {
         stderr.writef("\rScore Minimization [%s/%s (max)]", powell.iter, maxSteps);
         x = powell.step();
     }
-    stderr.write("\n");
+    stderr.writeln("\nScore:", scoreFunc(x));
     return x;
 }
 
-void writeParams(SingleSpectrumScore scoreFunc, double[] x) {
+void writeParams(SingleSpectrumScore scoreFunc, in double[] x, in double[] substLoadStats) {
     auto p = scoreFunc.makeSingleSpectrumParams(x);
     auto score = scoreFunc.getScore(p);
     foreach(key; ["mu", "V", "t", "s", "gamma", "c", "cw"])
         writefln("%s\t%s", key, p[key]);
+    foreach(i, key; ["neutralDrift", "weakSelDrift", "neutralHH", "weakSelHH", "adaptive", "driftLoad", "hhLoad"])
+        writefln("%s\t%s", key, substLoadStats[i]);
     writefln("score\t%s", score);
 }
 
-void writeParamsWithBootstrap(SingleSpectrumScore scoreFunc, double[] xMin, Accumulator accumulator) {
+void writeParamsWithBootstrap(SingleSpectrumScore scoreFunc, in double[] xMin, in double[] substLoadStats,
+                              Accumulator accumulator, Accumulator substLoadAccumulator) {
     auto p = scoreFunc.makeSingleSpectrumParams(xMin);
+    stderr.writeln("accumulator.mean: ", accumulator.mean());
+    stderr.writeln("accumulator.stddev: ", accumulator.stddev());
     auto pBSmean = scoreFunc.makeSingleSpectrumParams(accumulator.mean());
     auto pBSstddev = scoreFunc.makeSingleSpectrumParams(accumulator.stddev());
+    stderr.writeln("pBSmean:", pBSmean);
+    stderr.writeln("pBSstddev:", pBSstddev);
+    auto substLoadMean = substLoadAccumulator.mean();
+    auto substLoadStddev = substLoadAccumulator.stddev();
     
     auto score = scoreFunc.getScore(p);
     foreach(key; ["mu", "V", "t", "s", "gamma", "c", "cw"])
         writefln("%s\t%s\t%s\t%s", key, p[key], pBSmean[key], pBSstddev[key]);
+    foreach(i, key; ["neutralDrift", "weakSelDrift", "neutralHH", "weakSelHH", "adaptive", "driftLoad", "hhLoad"])
+        writefln("%s\t%s\t%s\t%s", key, substLoadStats[i], substLoadMean[i], substLoadStddev[i]);
     writefln("score\t%s", score);
 }
 
-ulong[] getBootstrap(ulong[] spectrum) {
+ulong[] getBootstrap(in ulong[] spectrum) {
     auto norm = spectrum.reduce!"a+b"();
     stderr.writef("bootstrapping from %s data points...", norm);
     auto ret = new ulong[spectrum.length];
@@ -151,11 +168,43 @@ ulong[] getBootstrap(ulong[] spectrum) {
     return ret;
 }
 
+double[7] getSubstAndLoadStats(SingleSpectrumScore scoreFunc, in double[] xMin) {
+    auto p = scoreFunc.makeSingleSpectrumParams(xMin);
+    auto m = cast(int)scoreFunc.m;
+    auto mu = p["mu"];
+    auto t = p["t"];
+    auto V = p["V"];
+    auto s = p["s"];
+    auto gamma = p["gamma"];
+    auto c = p["c"];
+    auto cw = p["cw"];
+    
+    // definition: double Q1vsM(int k, int m, double t, double mu, double s, double gamma, double V)
+    auto neutral = c * Q1vsM(m, m, t, mu, 0, 0, 0);
+    auto neutralAndHH = c * Q1vsM(m, m, t, mu, 0, 0, V);
+    auto driftOnly = neutral * exp(-V);
+    auto hh = neutralAndHH - driftOnly;
+
+    auto selDrift = (1.0 - c) * cw * Q1vsM(m, m, t, mu, s, 0, 0);
+    auto selDriftAndHH = (1.0 - c) * cw * Q1vsM(m, m, t, mu, s, 0, V);
+    auto selHH = selDriftAndHH - selDrift;
+  
+    auto adaptive = (1.0 - c) * (1.0 - cw) * 2.0 * gamma * t;
+  
+    auto totalSubst = neutralAndHH + selDriftAndHH + adaptive;
+  
+    auto driftLoad = selDrift * s;
+    auto hhLoad = selHH * s;
+    
+    return [driftOnly, selDrift, hh, selHH, adaptive, driftLoad, hhLoad];
+}
+
 class Accumulator {
     ubyte nrParams;
     double[] sums;
     double[] sums_sq;
     double norm;
+    double[][] inputs;
     
     this(ubyte nrParams) {
         this.nrParams = nrParams;
@@ -166,11 +215,12 @@ class Accumulator {
         norm = 0.0;
     }
     
-    void add(double[] x)
+    void add(in double[] x)
     in {
         assert(x.length == nrParams);
     }
     body {
+        inputs ~= x.dup;
         foreach(i, xx; x) {
             sums[i] += xx;
             sums_sq[i] += xx * xx;
@@ -178,11 +228,11 @@ class Accumulator {
         norm += 1.0;
     }
   
-    double[] mean() {
+    double[] mean() const {
         return iota(nrParams).map!(i => sums[i] / norm)().array;
     }
     
-    double[] stddev() {
+    double[] stddev() const {
         return iota(nrParams).map!(i => sqrt(sums_sq[i] / norm - (sums[i] / norm)^^2))().array;
     }
 }

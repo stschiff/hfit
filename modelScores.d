@@ -26,7 +26,7 @@ class SingleSpectrumScore {
     this.nrParams = nrParams;
   }
   
-  abstract double[string] makeSingleSpectrumParams(double[] x);
+  abstract double[string] makeSingleSpectrumParams(in double[] x);
   abstract double[] makeVecFromParams(double[string]);
   abstract double[] initialParams();
   abstract string[] paramNames();
@@ -39,7 +39,7 @@ class SingleSpectrumScore {
     if(p["gamma"] < 0.0 || 2.0 * p["gamma"] * p["t"] > 1.0)
       throw new IllegalParametersException("gamma out of range");
     if(p["s"] < 0.0 || p["s"] > 150.0)
-      throw new IllegalParametersException("selection out of range");
+      throw new IllegalParametersException(format("selection out of range:%s", p["s"]));
   }
   
   immutable(double)[] getSingleSpectrumProbs(double[string] p) {
@@ -85,11 +85,9 @@ class SingleSpectrumScore {
       score = getScore(p);
     }
     catch(IllegalParametersException e) {
-      debug stderr.writeln(e.msg, ", returning penalty");
       return penalty;
     }
     catch(GSLNumericsException e) {
-      debug stderr.writeln(e.msg, ", returning penalty");
       return penalty;
     }
     if(isnan(score)) {
@@ -98,7 +96,7 @@ class SingleSpectrumScore {
     return score;
   }
   
-  double opCall(double[] x) {
+  double opCall(in double[] x) {
     assert(x.length == nrParams);
     auto p = makeSingleSpectrumParams(x);
     return opCall(p);
@@ -111,7 +109,7 @@ class FullScore : SingleSpectrumScore {
     super(spectrum, 7);
   }
   
-  override double[string] makeSingleSpectrumParams(double[] x) {
+  override double[string] makeSingleSpectrumParams(in double[] x) {
     auto mu = x[0];
     auto V = x[1];
     auto t = x[2];
@@ -166,7 +164,7 @@ class DriverfieldNeutralScoreSel : SingleSpectrumScore {
     super(spectrum, 4);
   }
   
-  override double[string] makeSingleSpectrumParams(double[] x) {
+  override double[string] makeSingleSpectrumParams(in double[] x) {
     auto mu = x[0];
     auto V = x[1];
     auto t = x[2];
@@ -206,7 +204,7 @@ class DriverfieldNeutralScore : SingleSpectrumScore {
     super(spectrum, 3);
   }
   
-  override double[string] makeSingleSpectrumParams(double[] x) {
+  override double[string] makeSingleSpectrumParams(in double[] x) {
     auto mu = x[0];
     auto V = x[1];
     auto t = x[2];
@@ -243,7 +241,7 @@ class UnlinkedNeutralScoreSel : SingleSpectrumScore {
     super(spectrum, 3);
   }
   
-  override double[string] makeSingleSpectrumParams(double[] x) {
+  override double[string] makeSingleSpectrumParams(in double[] x) {
     auto mu = x[0];
     auto t = x[1];
     auto s = x[2];
@@ -281,7 +279,7 @@ class UnlinkedNeutralScore : SingleSpectrumScore {
     super(spectrum, 2);
   }
   
-  override double[string] makeSingleSpectrumParams(double[] x) {
+  override double[string] makeSingleSpectrumParams(in double[] x) {
     auto mu = x[0];
     auto t = x[1];
     double[string] params;
@@ -323,14 +321,14 @@ class ConstrainedNonNeutralScore : SingleSpectrumScore {
   override void checkParams(double[string] p) {
     super.checkParams(p);
     if(p["s"] < 1.0)
-      throw new IllegalParametersException("selection out of range");
+      throw new IllegalParametersException(format("selection out of range:%s", p["s"]));
   }
   
   override string[] paramNames() {
     return ["gamma", "c", "s", "cw"];
   }
   
-  override double[string] makeSingleSpectrumParams(double[] x) {
+  override double[string] makeSingleSpectrumParams(in double[] x) {
     auto gamma = x[0];
     auto c = x[1];
     auto s = x[2];
