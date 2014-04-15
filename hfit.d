@@ -19,10 +19,11 @@ string neutralFitFileName = "";
 model_t model = model_t.driverfieldNeutral;
 auto maxSteps = 500U;
 double mu, V, t; // for constrained model
+string spectrumFilename = "/dev/null";
+string inputData;
 ulong[] spectrum;
-string spectrumFilename;
 bool noBootstrap;
-auto nrBootStrapSamples = 4U;
+auto nrBootStrapSamples = 20U;
 
 void main(string[] args) {
   
@@ -40,23 +41,31 @@ void main(string[] args) {
 }
 
 void readCommandlineParams(string[] args) {
-    getopt(args, std.getopt.config.passThrough, "model|m", &model, "maxSteps", &maxSteps, "mu", &mu, "V", &V, "t", &t, "spectrumFile", &spectrumFilename, "noBootstrap", &noBootstrap);
-    enforce(args.length == 2, "need exactly one binning file");
-    auto inputFilename = args[1];
-    auto inputFile = inputFilename == "-" ? stdin : File(inputFilename, "r");
-    spectrum = inputFile.byLine.map!"a.to!ulong"().array;
+    getopt(args, std.getopt.config.passThrough, "model|m", &model, "maxSteps", &maxSteps, "mu", &mu, "V", &V, "t", &t, "spectrumFile", &spectrumFilename, "noBootstrap", &noBootstrap, "nrBootstrap|n", &nrBootStrapSamples, "inputData|i", &inputData);
+    if(inputData.length > 0)
+      spectrum = inputData.split(",").map!"a.to!ulong()"().array();
+    else {
+      enforce(args.length == 2, "need exactly one binning file");
+      auto inputFilename = args[1];
+      auto inputFile = inputFilename == "-" ? stdin : File(inputFilename, "r");
+      spectrum = inputFile.byLine.map!"a.to!ulong"().array;
+    }
     stderr.writeln("read spectrum: ", spectrum);
-    enforce(inputFilename == "-" || isFile(inputFilename), "illegal input file");
 }
 
 void displayHelpMessage() {
     stderr.writeln("singleSpectrumFit [options] <inputFile>
         Choose \"-\" to read input from stdin
-        -m, --model <model> : fit model for synonymous sites. Must be one of:
-              (driverfieldNeutral, driverfieldNeutralSel, unlinkedNeutral, unlinkedNeutralSel, constrainedNonNeutral) 
-              [default: driverfieldNeutral]
-        --maxSteps=<int> maximum number of iterations of Powell's method for minimization [default: 200]
+        -m, --model <model>                 fit model for synonymous sites. Must be one of:
+                                            (driverfieldNeutral, driverfieldNeutralSel, unlinkedNeutral, 
+                                             unlinkedNeutralSel, constrainedNonNeutral) 
+                                            [default: driverfieldNeutral]
+        --maxSteps=<int>                    maximum number of iterations of Powell's method for minimization
+                                            [default: 200]
         --noBootstrap
+        -i, --inputData                     input data given as comma-separated list of integers
+        --spectrumFile                      file to write the spectrum to
+        -n, --nrBootstrap                   nr of bootstrap samples
         --mu
         --V
         --t");
@@ -66,6 +75,7 @@ void run() {
     auto scoreFunc = getScoreFunc(spectrum, model);
     
     auto xMin = getMinimum(scoreFunc);
+    writeSpectrum(spectrumFilename, scoreFunc, xMin);
     stderr.writeln("params: ", xMin);
     auto substLoadStats = getSubstAndLoadStats(scoreFunc, xMin);
     
@@ -78,7 +88,7 @@ void run() {
         foreach(i; 0 .. nrBootStrapSamples) {
             stderr.writefln("Bootstrap sample %s", i);
             auto bootstrapSpectrum = getBootstrap(spectrum);
-            writeln("bootstrap spectrum: ", bootstrapSpectrum);
+            stderr.writeln("bootstrap spectrum: ", bootstrapSpectrum);
             auto bootstrapScoreFunc = getScoreFunc(bootstrapSpectrum, model);
             auto xMinBootstrap = getMinimum(bootstrapScoreFunc);
             stderr.writeln("params: ", xMinBootstrap);
@@ -202,6 +212,15 @@ double[7] getSubstAndLoadStats(SingleSpectrumScore scoreFunc, in double[] xMin) 
     
     return [driftOnly, selDrift, hh, selHH, adaptive, driftLoad, hhLoad];
 }
+
+void writeSpectrum(string spectrumFile, SingleSpectrumScore scoreFunc, double[] xmin) {
+  auto p = scoreFunc.makeSingleSpectrumParams(xmin);
+  auto spectrum = scoreFunc.getSingleSpectrumProbs(p);
+  auto f = File(spectrumFile, "w");
+  foreach(x; spectrum)
+    f.writeln(x);
+}
+
 
 class Accumulator {
     ubyte nrParams;
