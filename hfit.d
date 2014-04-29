@@ -13,7 +13,7 @@ import modelScores;
 import popGenFunc;
 import powell;
 
-enum model_t {driverfieldNeutral, driverfieldNeutralSel, unlinkedNeutral, unlinkedNeutralSel, constrainedNonNeutral}
+enum model_t {driverfieldNeutral, driverfieldNeutralSel, unlinkedNeutral, unlinkedNeutralSel, constrainedNonNeutral, constrainedSel}
 
 string neutralFitFileName = "";
 model_t model = model_t.driverfieldNeutral;
@@ -58,7 +58,7 @@ void displayHelpMessage() {
         Choose \"-\" to read input from stdin
         -m, --model <model>                 fit model for synonymous sites. Must be one of:
                                             (driverfieldNeutral, driverfieldNeutralSel, unlinkedNeutral, 
-                                             unlinkedNeutralSel, constrainedNonNeutral) 
+                                             unlinkedNeutralSel, constrainedNonNeutral, constrainedSel) 
                                             [default: driverfieldNeutral]
         --maxSteps=<int>                    maximum number of iterations of Powell's method for minimization
                                             [default: 200]
@@ -118,6 +118,8 @@ SingleSpectrumScore getScoreFunc(ulong[] spectrum, model_t model) {
         case model_t.constrainedNonNeutral:
         scoreFunc = new ConstrainedNonNeutralScore(spectrum, mu, V, t);
         break;
+        case model_t.constrainedSel:
+        scoreFunc = new ConstrainedSelScore(spectrum, mu, V, t);
     }
     return scoreFunc;
 }

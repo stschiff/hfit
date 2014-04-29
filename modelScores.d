@@ -363,3 +363,48 @@ class ConstrainedNonNeutralScore : SingleSpectrumScore {
   }
 }
 
+class ConstrainedSelScore : SingleSpectrumScore {
+  
+  double mu, V, t;
+  
+  this(in ulong[] spectrum, double mu, double V, double t) {
+    super(spectrum, 1);
+    this.mu = mu;
+    this.V = V;
+    this.t = t;
+  }
+  
+  override void checkParams(double[string] p) {
+    super.checkParams(p);
+  }
+  
+  override string[] paramNames() {
+    return ["s"];
+  }
+  
+  override double[string] makeSingleSpectrumParams(in double[] x) {
+    auto s = x[0];
+    double[string] params;
+    params["mu"] = mu;
+    params["V"] = V;
+    params["t"] = t;
+    params["gamma"] = 0.0;
+    params["c"] = 0.0;
+    params["s"] = s;
+    params["cw"] = 1.0;
+    return params;
+  }
+  
+  override double[] initialParams() {
+    auto ret = new double[1];
+    ret[0] = 1.0;
+    return ret;
+  }
+  
+  override double[] makeVecFromParams(double[string] p) {
+    auto ret = new double[1];
+    ret[0] = p["s"];
+    return ret;
+  }
+}
+
