@@ -320,7 +320,7 @@ class ConstrainedNonNeutralScore : SingleSpectrumScore {
   
   override void checkParams(double[string] p) {
     super.checkParams(p);
-    if(p["s"] < 1.0)
+    if(p["s"] < 1.0 || p["s"] > 10.0)
       throw new IllegalParametersException(format("selection out of range:%s", p["s"]));
   }
   
