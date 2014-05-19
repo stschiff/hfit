@@ -208,8 +208,6 @@ double[7] getSubstAndLoadStats(SingleSpectrumScore scoreFunc, in double[] xMin) 
   
     auto adaptive = (1.0 - c) * (1.0 - cw) * 2.0 * gamma * t;
 
-    auto double uLinkage(double sigma, double mu, double V);
-  
     auto driftLoad = (1.0 - c) * cw * 2.0 * u0(-s, mu) / (u0(s, mu) + u0(-s, mu));
     auto hhAndDriftLoad = (1.0 - c) * cw * 2.0 * uLinkage(-s, mu, V) / (uLinkage(s, mu, V) + uLinkage(-s, mu, V));
     auto hhLoad = hhAndDriftLoad - driftLoad;
