@@ -203,14 +203,19 @@ double[7] getSubstAndLoadStats(SingleSpectrumScore scoreFunc, in double[] xMin) 
 
     auto selDrift = (1.0 - c) * cw * Q1vsM(m, m, t, mu, s, 0, 0);
     auto selDriftAndHH = (1.0 - c) * cw * Q1vsM(m, m, t, mu, s, 0, V);
-    auto selHH = selDriftAndHH - selDrift;
+    auto selDriftOnly = selDrift * exp(-V);
+    auto selHH = selDriftAndHH - selDriftOnly;
   
     auto adaptive = (1.0 - c) * (1.0 - cw) * 2.0 * gamma * t;
+
+    auto double uLinkage(double sigma, double mu, double V);
   
-    auto totalSubst = neutralAndHH + selDriftAndHH + adaptive;
-  
-    auto driftLoad = selDrift * s;
-    auto hhLoad = selHH * s;
+    auto driftLoad = (1.0 - c) * cw * 2.0 * u0(-s, mu) / (u0(s, mu) + u0(-s, mu));
+    auto hhAndDriftLoad = (1.0 - c) * cw * 2.0 * uLinkage(-s, mu, V) / (uLinkage(s, mu, V) + uLinkage(-s, mu, V));
+    auto hhLoad = hhAndDriftLoad - driftLoad;
+    
+    // auto driftLoad = selDrift * s;
+    // auto hhLoad = selHH * s;
     
     return [driftOnly, selDrift, hh, selHH, adaptive, driftLoad, hhLoad];
 }
