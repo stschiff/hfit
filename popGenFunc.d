@@ -114,6 +114,8 @@ double bico(int m, int k) {
   return floor(0.5 + exp(factln(m) - factln(k) - factln(m - k)));
 }
 
+// sigma, mu, t and V are all scaled by 2N.
+
 double u0(double sigma, double mu) {
   double ret = mu;
   if(fabs(sigma) > eps) ret = mu * sigma / (1.0 - exp(-sigma));
