@@ -158,7 +158,7 @@ double[string] getMinimumParams(SingleSpectrumScore scoreFunc) {
     }
     
     auto p = scoreFunc.makeSingleSpectrumParams(x);
-    auto score = scoreFunc.getScore(p);
+    auto score = scoreFunc(x);
     stderr.writeln("\nScore:", score);
     
     auto mu = p["mu"];
@@ -243,8 +243,8 @@ void writeSpectrum(string spectrumFile, SingleSpectrumScore scoreFunc, double[st
   p["V"] = pMin["nu"] * pMin["lambda"];
   p["s"] = pMin["sigma"] * pMin["lambda"];
   p["c"] = pMin["cn"];
-  p["cw"] = pMin["cw"] / (1.0 - pMin["cn"]);
-  p["gamma"] = pMin["ca"] / ((1.0 - pMin["cn"] - pMin["cw"]) * 2.0 * p["t"]);
+  p["cw"] = pMin["cw"] > 0.0 ? pMin["cw"] / (1.0 - p["c"]) : 0.0;
+  p["gamma"] = pMin["ca"] > 0.0 ? pMin["ca"] / ((1.0 - p["c"]) * (1.0 - p["cw"]) * 2.0 * p["t"]) : 0.0;
   
   auto spectrum = scoreFunc.getSingleSpectrumProbs(p);
   auto f = File(spectrumFile, "w");

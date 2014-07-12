@@ -41,8 +41,8 @@ class SingleSpectrumScore {
       throw new IllegalParametersException("c out of range");
     if(p["cw"] < 0.0 || p["cw"] > 1.0)
       throw new IllegalParametersException("cw out of range");
-    if(p["gamma"] < 0.0 || 2.0 * p["gamma"] * p["t"] > 1.0)
-      throw new IllegalParametersException("gamma out of range");
+    if(p["gamma"] < 0.0 || 2.0 * p["gamma"] * p["t"] > 1.0 + 1.0e-8)
+      throw new IllegalParametersException(format("2*gamma*t=%s out of range", 2.0 * p["gamma"] * p["t"]));
     if(p["s"] < 0.0 || p["s"] > 150.0)
       throw new IllegalParametersException(format("selection out of range:%s", p["s"]));
   }
