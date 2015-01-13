@@ -12,6 +12,7 @@ import std.random;
 import modelScores;
 import popGenFunc;
 import powell;
+import mcmc;
 
 enum model_t {UNLINKED, BGS_HH, BGS_HH_S, BGS_HH_S_CONSTRAINED, BGS, BGS_S, MIXED}
 
@@ -22,8 +23,9 @@ double theta, nu, lambda, tau;
 string spectrumFilename = "/dev/null";
 string inputData;
 ulong[] spectrum;
-bool noBootstrap;
-auto nrBootStrapSamples = 20U;
+bool noMCMC;
+auto nrMCMCcycles = 1000;
+string mcmcTraceFile = "/dev/null";
 
 void main(string[] args) {
   
@@ -41,7 +43,19 @@ void main(string[] args) {
 }
 
 void readCommandlineParams(string[] args) {
-    getopt(args, std.getopt.config.passThrough, "model|m", &model, "maxSteps", &maxSteps, "theta", &theta, "nu", &nu, "tau", &tau, "lambda", &lambda, "spectrumFile", &spectrumFilename, "noBootstrap", &noBootstrap, "nrBootstrap|n", &nrBootStrapSamples, "inputData|i", &inputData);
+    getopt(args, std.getopt.config.passThrough,
+           "model|m", &model,
+           "maxSteps", &maxSteps,
+           "theta", &theta,
+           "nu", &nu,
+           "tau", &tau,
+           "lambda", &lambda,
+           "spectrumFile", &spectrumFilename,
+           "noMCMC", &noMCMC,
+           "nrMCMCcycles|n", &nrMCMCcycles,
+           "mcmcTraceFile", &mcmcTraceFile,
+           "inputData|i", &inputData);
+   
     if(inputData.length > 0)
       spectrum = inputData.split(",").map!"a.to!ulong()"().array();
     else {
@@ -81,41 +95,44 @@ void displayHelpMessage() {
                                             [default: BGS_HH]
         --maxSteps=<int>                    maximum number of iterations of Powell's method for minimization
                                             [default: 200]
-        --noBootstrap                       no boostrapping
+        --noMCMC                            no MCMC
         -i, --inputData                     input data given as comma-separated list of integers
         --spectrumFile                      file to write the spectrum to
-        -n, --nrBootstrap                   nr of bootstrap samples [default: 20]
+        -n, --nrMCMCcycles                  nr of MCMC main cycles [default: 1000]
         --tau                               input for fixed model parameters
         --theta                             input for fixed model parameters
         --nu                                input for fixed model parameters
         --lambda                            input for fixed model parameters
+        --mcmcTraceFile                     file to write MCMC trace to
 
-        The output of the program contains columns with model estimates. The first column is the name of the parameter. The second column is the maximum likelihood estimate. The third column is the standard deviation for the parameter, obtained from boostrapping (omitted if --noBoostrap is given)\n");
+        The output of the program contains columns with model estimates. The first column is the name of the parameter. The second column is the maximum likelihood estimate. The third column is the standard deviation for the parameter, obtained from boostrapping (omitted if --noMCMC is given)\n");
 }
 
 void run() {
     auto scoreFunc = getScoreFunc(spectrum, model);
     
-    auto pMin = getMinimumParams(scoreFunc);
-    
-    writeSpectrum(spectrumFilename, scoreFunc, pMin);
-    stderr.writeln("params: ", pMin);
-    
-    if(noBootstrap) {
+    auto xMin = findMinimum(scoreFunc);
+    stderr.writeln("found minimum: ", xMin);
+    writeSpectrum(spectrumFilename, scoreFunc, xMin);
+    auto pMin = getNamedParams(scoreFunc, xMin);
+
+    if(noMCMC) {
         writeParams(pMin);
     }
     else {
+        stderr.writeln("starting MCMC");
+        auto mcmc = new MCMC!SingleSpectrumScore(scoreFunc, xMin);
         auto accumulator = new Accumulator(pMin.keys());
-        foreach(i; 0 .. nrBootStrapSamples) {
-            stderr.writefln("Bootstrap sample %s", i);
-            auto bootstrapSpectrum = getBootstrap(spectrum);
-            stderr.writeln("bootstrap spectrum: ", bootstrapSpectrum);
-            auto bootstrapScoreFunc = getScoreFunc(bootstrapSpectrum, model);
-            auto pMinBootstrap = getMinimumParams(bootstrapScoreFunc);
-            stderr.writeln("params: ", pMinBootstrap);
-            accumulator.add(pMinBootstrap);
+        mcmc.run(nrMCMCcycles);
+        auto nrBurninSteps = mcmc.getNrBurninCycles();
+        stderr.writefln("done MCMC, with %s burnin cycles and %s main cycles", nrBurninSteps, mcmc.trace.length - nrBurninSteps);
+        foreach(i; nrBurninSteps .. mcmc.trace.length) {
+            auto x = mcmc.trace[i];
+            auto pMinCycle = getNamedParams(scoreFunc, x);
+            accumulator.add(pMinCycle);
         }
         writeParamsWithBootstrap(pMin, accumulator);
+        mcmc.reportTraces(mcmcTraceFile);
     }
 }  
 
@@ -145,10 +162,11 @@ SingleSpectrumScore getScoreFunc(ulong[] spectrum, model_t model) {
     return scoreFunc;
 }
 
-double[string] getMinimumParams(SingleSpectrumScore scoreFunc) {
-
+double[] findMinimum(SingleSpectrumScore scoreFunc) {
+    
     auto powell = new Powell!SingleSpectrumScore(scoreFunc);
     auto xInitial = scoreFunc.initialParams();
+    return xInitial;
     powell.init(xInitial);
     
     double[] x;
@@ -156,10 +174,12 @@ double[string] getMinimumParams(SingleSpectrumScore scoreFunc) {
         stderr.writef("\rScore Minimization [%s/%s (max)]", powell.iter, maxSteps);
         x = powell.step();
     }
-    
+    return x;
+}
+
+double[string] getNamedParams(SingleSpectrumScore scoreFunc, double[] x) {
     auto p = scoreFunc.makeSingleSpectrumParams(x);
     auto score = scoreFunc(x);
-    stderr.writeln("\nScore:", score);
     
     auto mu = p["mu"];
     auto t = p["t"];
@@ -214,71 +234,69 @@ double[string] getMinimumParams(SingleSpectrumScore scoreFunc) {
 
 
 void writeParams(in double[string] p) {
+    writefln("Parameter\tMaximumLL");
     foreach(k, v; p)
         writefln("%s\t%s", k, v);
 }
 
 void writeParamsWithBootstrap(in double[string] p, in Accumulator accumulator) {
-    foreach(k, v; p)
-        writefln("%s\t%s\t%s", k, v, accumulator.stddev(k));
-}
-
-ulong[] getBootstrap(in ulong[] spectrum) {
-    auto norm = spectrum.reduce!"a+b"();
-    stderr.writef("bootstrapping from %s data points...", norm);
-    auto ret = new ulong[spectrum.length];
-    foreach(i; 0 .. norm) {
-        auto k = dice(spectrum);
-        ret[k] += 1;
+    writefln("Parameter\tMaximumLL\tMCMCmedian\tMCMClowerCI\tMCMCupperCI");
+    foreach(k, v; p) {
+        auto orderStats = accumulator.orderStats(k);
+        writefln("%s\t%s\t%s\t%s\t%s", k, v, orderStats[1], orderStats[0], orderStats[2]);
     }
-    stderr.writeln("done");
-    return ret;
 }
 
-void writeSpectrum(string spectrumFile, SingleSpectrumScore scoreFunc, double[string] pMin) {
+// ulong[] getBootstrap(in ulong[] spectrum) {
+//     auto norm = spectrum.reduce!"a+b"();
+//     stderr.writef("bootstrapping from %s data points...", norm);
+//     auto ret = new ulong[spectrum.length];
+//     foreach(i; 0 .. norm) {
+//         auto k = dice(spectrum);
+//         ret[k] += 1;
+//     }
+//     stderr.writeln("done");
+//     return ret;
+// }
+//
+
+void writeSpectrum(string spectrumFile, SingleSpectrumScore scoreFunc, double[] xMin) {
   
-  double[string] p;
-  p["t"] = tau / pMin["lambda"];
-  p["mu"] = pMin["theta"] * pMin["lambda"];
-  p["V"] = pMin["nu"] * pMin["lambda"];
-  p["s"] = pMin["sigma"] * pMin["lambda"];
-  p["c"] = pMin["cn"];
-  p["cw"] = pMin["cw"] > 0.0 ? pMin["cw"] / (1.0 - p["c"]) : 0.0;
-  p["gamma"] = pMin["ca"] > 0.0 ? pMin["ca"] / ((1.0 - p["c"]) * (1.0 - p["cw"]) * 2.0 * p["t"]) : 0.0;
-  
-  auto spectrum = scoreFunc.getSingleSpectrumProbs(p);
-  auto f = File(spectrumFile, "w");
-  foreach(x; spectrum)
-    f.writeln(x);
+    auto p = scoreFunc.makeSingleSpectrumParams(xMin);
+    // p["t"] = tau / pMin["lambda"];
+    // p["mu"] = pMin["theta"] * pMin["lambda"];
+    // p["V"] = pMin["nu"] * pMin["lambda"];
+    // p["s"] = pMin["sigma"] * pMin["lambda"];
+    // p["c"] = pMin["cn"];
+    // p["cw"] = pMin["cw"] > 0.0 ? pMin["cw"] / (1.0 - p["c"]) : 0.0;
+    // p["gamma"] = pMin["ca"] > 0.0 ? pMin["ca"] / ((1.0 - p["c"]) * (1.0 - p["cw"]) * 2.0 * p["t"]) : 0.0;
+
+    auto spectrum = scoreFunc.getSingleSpectrumProbs(p);
+    auto f = File(spectrumFile, "w");
+    foreach(x; spectrum)
+        f.writeln(x);
 }
 
 class Accumulator {
-    double[string] sums;
-    double[string] sums_sq;
-    double norm;
-    
+    double[][string] values;
+
     this(string[] keys) {
-        foreach(k; keys) {
-            sums[k] = 0.0;
-            sums_sq[k] = 0.0;
-        }
-        norm = 0.0;
+        foreach(k; keys)
+            values[k] = [];
     }
-    
+
     void add(in double[string] p)
     {
-        foreach(k, v; p) {
-            sums[k] += v;
-            sums_sq[k] += v * v;
-        }
-        norm += 1.0;
-    }
-  
-    double mean(string key) const {
-        return sums[key] / norm;
+        foreach(k, v; p)
+            values[k] ~= v;
     }
     
-    double stddev(string key) const {
-        return sqrt(max(sums_sq[key] / norm - (sums[key] / norm)^^2, 0.0));
+    double[3] orderStats(string key) const {
+        auto sorted = values[key].dup;
+        sorted.sort();
+        auto midIndex = to!int(sorted.length / 2);
+        auto lowerCIindex = to!int(sorted.length * 0.025);
+        auto upperCIindex = to!int(sorted.length * 0.975);
+        return [sorted[lowerCIindex], sorted[midIndex], sorted[upperCIindex]];
     }
 }
