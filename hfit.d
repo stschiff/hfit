@@ -166,7 +166,7 @@ double[] findMinimum(SingleSpectrumScore scoreFunc) {
     
     auto powell = new Powell!SingleSpectrumScore(scoreFunc);
     auto xInitial = scoreFunc.initialParams();
-    return xInitial;
+    // return xInitial;
     powell.init(xInitial);
     
     double[] x;
