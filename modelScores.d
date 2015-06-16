@@ -95,7 +95,7 @@ class SingleSpectrumScore {
     catch(GSLNumericsException e) {
       return penalty;
     }
-    if(isnan(score)) {
+    if(isNaN(score)) {
       return penalty;
     }
     return score;
@@ -409,6 +409,50 @@ class MixedScore : SingleSpectrumScore {
     ret[1] = p["c"];
     ret[2] = p["s"];
     ret[3] = p["cw"];
+    return ret;
+  }
+}
+
+class MixedSimpleScore : SingleSpectrumScore {
+  
+  double mu, V, t;
+  
+  this(in ulong[] spectrum, double mu, double V, double t) {
+    super(spectrum, 4);
+    this.mu = mu;
+    this.V = V;
+    this.t = t;
+  }
+  
+  override string[] paramNames() {
+    return ["gamma", "c"];
+  }
+  
+  override double[string] makeSingleSpectrumParams(in double[] x) {
+    auto gamma = x[0];
+    auto c = x[1];
+    double[string] params;
+    params["mu"] = mu;
+    params["V"] = V;
+    params["t"] = t;
+    params["gamma"] = gamma;
+    params["c"] = c;
+    params["s"] = 0.0;
+    params["cw"] = 0.0;
+    return params;
+  }
+  
+  override double[] initialParams() {
+    auto ret = new double[2];
+    ret[0] = 0.0;
+    ret[1] = 0.5;
+    return ret;
+  }
+  
+  override double[] makeVecFromParams(double[string] p) {
+    auto ret = new double[2];
+    ret[0] = p["gamma"];
+    ret[1] = p["c"];
     return ret;
   }
 }

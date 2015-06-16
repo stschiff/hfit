@@ -14,7 +14,7 @@ import popGenFunc;
 import powell;
 import mcmc;
 
-enum model_t {UNLINKED, BGS_HH, BGS_HH_S, BGS_HH_S_CONSTRAINED, BGS, BGS_S, MIXED}
+enum model_t {UNLINKED, BGS_HH, BGS_HH_S, BGS_HH_S_CONSTRAINED, BGS, BGS_S, MIXED, MIXED_SIMPLE}
 
 string neutralFitFileName = "";
 model_t model = model_t.BGS_HH;
@@ -91,6 +91,9 @@ void displayHelpMessage() {
                                             * MIXED:
                                                 Free parameters: cn, cw, ca, sigma
                                                 Additional Input: theta, nu, lambda
+                                            * MIXED_SIMPLE:
+                                                Free parameters: cn, ca
+                                                AdditionalInput: theta, nu, lambda
                                                
                                             [default: BGS_HH]
         --maxSteps=<int>                    maximum number of iterations of Powell's method for minimization
@@ -157,6 +160,9 @@ SingleSpectrumScore getScoreFunc(ulong[] spectrum, model_t model) {
         break;
         case model_t.MIXED:
         scoreFunc = new MixedScore(spectrum, theta * lambda, nu * lambda, tau / lambda);
+        break;
+        case model_t.MIXED_SIMPLE:
+        scoreFunc = new MixedSimpleScore(spectrum, theta * lambda, nu * lambda, tau / lambda);
         break;
     }
     return scoreFunc;
