@@ -14,7 +14,7 @@ import popGenFunc;
 import powell;
 import mcmc;
 
-enum model_t {UNLINKED, BGS_HH, BGS_HH_S, BGS_HH_S_CONSTRAINED, BGS, BGS_S, MIXED, MIXED_SIMPLE}
+enum model_t {UNLINKED, BGS_HH, BGS_HH_CONSTRAINED, BGS_HH_S, BGS_HH_S_CONSTRAINED, BGS, BGS_CONSTRAINED, BGS_S, MIXED, MIXED_SIMPLE}
 
 string neutralFitFileName = "";
 model_t model = model_t.BGS_HH;
@@ -79,6 +79,9 @@ void displayHelpMessage() {
                                             All of the following require --tau as input parameter:
                                             * BGS_HH:
                                                 Free parameters: theta, nu, lambda
+                                            * BGS_HH_CONSTRAINED:
+                                                Free parameters: nu, lambda
+                                                Additional Input: theta
                                             * BGS_HH_S:
                                                 Free parameters: theta, nu, lambda, sigma
                                             * BGS_HH_S_CONSTRAINED:
@@ -86,6 +89,9 @@ void displayHelpMessage() {
                                                 Additional input: theta, lambda, nu
                                             * BGS:
                                                 Free parameters: theta, lambda
+                                            * BGS_CONSTRAINED:
+                                                Free parameters: lambda
+                                                Additional Input: theta
                                             * BGS_S:
                                                 Free parameters: theta, lambda, sigma
                                             * MIXED:
@@ -145,6 +151,9 @@ SingleSpectrumScore getScoreFunc(ulong[] spectrum, model_t model) {
         case model_t.BGS_HH:
         scoreFunc = new BGS_HH_Score(spectrum);
         break;
+        case model_t.BGS_HH_CONSTRAINED:
+        scoreFunc = new BGS_HH_constrained_Score(spectrum, theta * tau);
+        break;
         case model_t.BGS_HH_S:
         scoreFunc = new BGS_HH_S_Score(spectrum);
         break;
@@ -154,6 +163,9 @@ SingleSpectrumScore getScoreFunc(ulong[] spectrum, model_t model) {
         case model_t.BGS:
         case model_t.UNLINKED:
         scoreFunc = new BGS_Score(spectrum);
+        break;
+        case model_t.BGS_CONSTRAINED:
+        scoreFunc = new BGS_constrained_Score(spectrum, theta * tau);
         break;
         case model_t.BGS_S:
         scoreFunc = new BGS_S_Score(spectrum);
@@ -195,9 +207,9 @@ double[string] getNamedParams(SingleSpectrumScore scoreFunc, double[] x) {
     auto c = p["c"];
     auto cw = p["cw"];
     
-    // the internals of this software use a different parameterization, using 2N, not 2N_0 as the scaling factor. Also there is a bit different usage of cn, cw and ca (see modelScores.d). That's why we scale everything to match the notation in the article (Schiffels, Mustonen, Laessig, 2014)
+    // the internals of this software use a different parameterization, using 2N, not 2N_0 as the scaling factor. Also there is a bit different usage of cn, cw and ca (see modelScores.d). That's why we scale everything to match the notation in the preprint (Schiffels, Mustonen, Laessig, 2014)
     double[string] ret;
-    if(model == model_t.UNLINKED) 
+    if(model == model_t.UNLINKED)
       tau = p["t"];
     auto lambda = tau / t;
     ret["tau"] = tau;
