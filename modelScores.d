@@ -418,7 +418,7 @@ class MixedSimpleScore : SingleSpectrumScore {
   double mu, V, t;
   
   this(in ulong[] spectrum, double mu, double V, double t) {
-    super(spectrum, 4);
+    super(spectrum, 2);
     this.mu = mu;
     this.V = V;
     this.t = t;
