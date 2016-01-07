@@ -163,7 +163,7 @@ class FullScore : SingleSpectrumScore {
 }
 
 
-class BGS_HH_S_Score : SingleSpectrumScore {
+class LinkedSelection_withS_Score : SingleSpectrumScore {
 
   this(in ulong[] spectrum) {
     super(spectrum, 4);
@@ -203,53 +203,7 @@ class BGS_HH_S_Score : SingleSpectrumScore {
   
 }
 
-class BGS_HH_S_constrained_Score : SingleSpectrumScore {
-  
-  double mu, V, t;
-  
-  this(in ulong[] spectrum, double mu, double V, double t) {
-    super(spectrum, 1);
-    this.mu = mu;
-    this.V = V;
-    this.t = t;
-  }
-  
-  override void checkParams(double[string] p) {
-    super.checkParams(p);
-  }
-  
-  override string[] paramNames() {
-    return ["s"];
-  }
-  
-  override double[string] makeSingleSpectrumParams(in double[] x) {
-    auto s = x[0];
-    double[string] params;
-    params["mu"] = mu;
-    params["V"] = V;
-    params["t"] = t;
-    params["gamma"] = 0.0;
-    params["c"] = 0.0;
-    params["s"] = s;
-    params["cw"] = 1.0;
-    return params;
-  }
-  
-  override double[] initialParams() {
-    auto ret = new double[1];
-    ret[0] = 1.0;
-    return ret;
-  }
-  
-  override double[] makeVecFromParams(double[string] p) {
-    auto ret = new double[1];
-    ret[0] = p["s"];
-    return ret;
-  }
-}
-
-
-class BGS_HH_Score : SingleSpectrumScore {
+class LinkedSelection_Score : SingleSpectrumScore {
 
   this(in ulong[] spectrum) {
     super(spectrum, 3);
@@ -285,45 +239,7 @@ class BGS_HH_Score : SingleSpectrumScore {
   }
 }
 
-class BGS_HH_constrained_Score : SingleSpectrumScore {
-
-  double muT;
-  
-  this(in ulong[] spectrum, double muT) {
-    this.muT = muT;
-    super(spectrum, 2);
-  }
-  
-  override double[string] makeSingleSpectrumParams(in double[] x) {
-    auto mu = x[0];
-    auto V = x[1];
-    auto t = muT / mu;
-    double[string] params;
-    params = ["mu":mu, "t":t, "V":V, "s":0.0, "gamma":0.0, "c":1.0, "cw":0.0];
-    return params;
-  }
-  
-  override string[] paramNames() {
-    return ["mu", "V"];
-  }
-  
-  override double[] initialParams() {
-    auto ret = new double[2];
-    ret[0] = 0.01;
-    ret[1] = 0.1;
-    return ret;
-  }
-  
-  override double[] makeVecFromParams(double[string] p) {
-    auto ret = new double[3];
-    ret[0] = p["mu"];
-    ret[1] = p["V"];
-    return ret;
-  }
-}
-
-
-class BGS_S_Score : SingleSpectrumScore {
+class ReducedNe_withS_Score : SingleSpectrumScore {
   
   this(in ulong[] spectrum) {
     super(spectrum, 3);
@@ -360,7 +276,7 @@ class BGS_S_Score : SingleSpectrumScore {
   
 }
 
-class BGS_Score : SingleSpectrumScore {
+class ReducedNe_Score : SingleSpectrumScore {
   
   this(in ulong[] spectrum) {
     super(spectrum, 2);
@@ -389,40 +305,6 @@ class BGS_Score : SingleSpectrumScore {
     auto ret = new double[2];
     ret[0] = p["mu"];
     ret[1] = p["t"];
-    return ret;
-  }
-  
-}
-
-class BGS_constrained_Score : SingleSpectrumScore {
-  
-  double muT;
-  this(in ulong[] spectrum, double muT) {
-    this.muT = muT;
-    super(spectrum, 1);
-  }
-  
-  override double[string] makeSingleSpectrumParams(in double[] x) {
-    auto mu = x[0];
-    auto t = muT / mu;
-    double[string] params;
-    params = ["mu":mu, "t":t, "s":0.0, "V":0.0, "gamma":0.0, "c":1.0, "cw":0.0];
-    return params;
-  }
-  
-  override string[] paramNames() {
-    return ["mu"];
-  }
-  
-  override double[] initialParams() {
-    auto ret = new double[1];
-    ret[0] = 0.01;
-    return ret;
-  }
-  
-  override double[] makeVecFromParams(double[string] p) {
-    auto ret = new double[1];
-    ret[0] = p["mu"];
     return ret;
   }
   

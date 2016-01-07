@@ -14,12 +14,12 @@ import popGenFunc;
 import powell;
 import mcmc;
 
-enum model_t {UNLINKED, BGS_HH, BGS_HH_CONSTRAINED, BGS_HH_S, BGS_HH_S_CONSTRAINED, BGS, BGS_CONSTRAINED, BGS_S, MIXED, MIXED_SIMPLE}
+enum model_t {LINKED_SELECTION, LINKED_SELECTION_WITHS, REDUCED_NE, REDUCED_NE_WITHS, MIXED, MIXED_SIMPLE}
 
 string neutralFitFileName = "";
-model_t model = model_t.BGS_HH;
+model_t model = model_t.LINKED_SELECTION;
 auto maxSteps = 500U;
-double theta, nu, lambda, tau;
+double theta, nu, tau;
 string spectrumFilename = "/dev/null";
 string inputData;
 ulong[] spectrum;
@@ -49,7 +49,6 @@ void readCommandlineParams(string[] args) {
            "theta", &theta,
            "nu", &nu,
            "tau", &tau,
-           "lambda", &lambda,
            "spectrumFile", &spectrumFilename,
            "noMCMC", &noMCMC,
            "nrMCMCcycles|n", &nrMCMCcycles,
@@ -57,16 +56,18 @@ void readCommandlineParams(string[] args) {
            "inputData|i", &inputData);
    
     if(inputData.length > 0)
-      spectrum = inputData.split(",").map!"a.to!ulong()"().array();
+        spectrum = inputData.split(",").map!"a.to!ulong()"().array();
     else {
-      enforce(args.length == 2, "need exactly one binning file");
-      auto inputFilename = args[1];
-      auto inputFile = inputFilename == "-" ? stdin : File(inputFilename, "r");
-      spectrum = inputFile.byLine.map!"a.to!ulong"().array;
+        enforce(args.length == 2, "need exactly one binning file");
+        auto inputFilename = args[1];
+        auto inputFile = inputFilename == "-" ? stdin : File(inputFilename, "r");
+        spectrum = inputFile.byLine.map!"a.to!ulong"().array;
     }
     
-    if(model != model_t.UNLINKED)
-      enforce(tau > 0.0, "need --tau");
+    if(model == model_t.MIXED || model == model_t.MIXED_SIMPLE) {
+        enforce(tau > 0.0, "need --tau");
+        enforce(theta > 0.0, "need --theta");
+    }
     
     stderr.writeln("read spectrum: ", spectrum);
 }
@@ -74,34 +75,23 @@ void readCommandlineParams(string[] args) {
 void displayHelpMessage() {
     stderr.writeln("singleSpectrumFit [options] <inputFile>
         Choose \"-\" to read input from stdin
-        -m, --model <model>                 fit model for synonymous sites. Must be one of the following:
-                                            * UNLINKED: Free parameters: theta, tau.
-                                            All of the following require --tau as input parameter:
-                                            * BGS_HH:
-                                                Free parameters: theta, nu, lambda
-                                            * BGS_HH_CONSTRAINED:
-                                                Free parameters: nu, lambda
-                                                Additional Input: theta
-                                            * BGS_HH_S:
-                                                Free parameters: theta, nu, lambda, sigma
-                                            * BGS_HH_S_CONSTRAINED:
-                                                Free parameters: sigma,
-                                                Additional input: theta, lambda, nu
-                                            * BGS:
-                                                Free parameters: theta, lambda
-                                            * BGS_CONSTRAINED:
-                                                Free parameters: lambda
-                                                Additional Input: theta
-                                            * BGS_S:
-                                                Free parameters: theta, lambda, sigma
+        -m, --model <model>                 fit model. Must be one of the following:
+                                            * LINKED_SELECTION:
+                                                Free parameters: theta, nu, tau
+                                            * LINKED_SELECTION_WITHS:
+                                                Free parameters: theta, nu, tau, sigma
+                                            * REDUCED_NE:
+                                                Free parameters: theta, tau
+                                            * REDUCED_NE_WITHS:
+                                                Free parameters: theta, tau, sigma
                                             * MIXED:
                                                 Free parameters: cn, cw, ca, sigma
-                                                Additional Input: theta, nu, lambda
+                                                Additional Input: theta, nu, tau
                                             * MIXED_SIMPLE:
                                                 Free parameters: cn, ca
-                                                AdditionalInput: theta, nu, lambda
+                                                AdditionalInput: theta, nu, tau
                                                
-                                            [default: BGS_HH]
+                                            [default: LINKED_SELECTION]
         --maxSteps=<int>                    maximum number of iterations of Powell's method for minimization
                                             [default: 200]
         --noMCMC                            no MCMC
@@ -111,7 +101,6 @@ void displayHelpMessage() {
         --tau                               input for fixed model parameters
         --theta                             input for fixed model parameters
         --nu                                input for fixed model parameters
-        --lambda                            input for fixed model parameters
         --mcmcTraceFile                     file to write MCMC trace to
 
         The output of the program contains columns with model estimates. The first column is the name of the parameter. The second column is the maximum likelihood estimate. The third column is the standard deviation for the parameter, obtained from boostrapping (omitted if --noMCMC is given)\n");
@@ -148,33 +137,23 @@ void run() {
 SingleSpectrumScore getScoreFunc(ulong[] spectrum, model_t model) {
     SingleSpectrumScore scoreFunc;
     final switch(model) {
-        case model_t.BGS_HH:
-        scoreFunc = new BGS_HH_Score(spectrum);
+        case model_t.LINKED_SELECTION:
+        scoreFunc = new LinkedSelection_Score(spectrum);
         break;
-        case model_t.BGS_HH_CONSTRAINED:
-        scoreFunc = new BGS_HH_constrained_Score(spectrum, theta * tau);
+        case model_t.LINKED_SELECTION_WITHS:
+        scoreFunc = new LinkedSelection_withS_Score(spectrum);
         break;
-        case model_t.BGS_HH_S:
-        scoreFunc = new BGS_HH_S_Score(spectrum);
+        case model_t.REDUCED_NE:
+        scoreFunc = new ReducedNe_Score(spectrum);
         break;
-        case model_t.BGS_HH_S_CONSTRAINED:
-        scoreFunc = new BGS_HH_S_constrained_Score(spectrum, theta * lambda, nu * lambda, tau / lambda);
-        break;
-        case model_t.BGS:
-        case model_t.UNLINKED:
-        scoreFunc = new BGS_Score(spectrum);
-        break;
-        case model_t.BGS_CONSTRAINED:
-        scoreFunc = new BGS_constrained_Score(spectrum, theta * tau);
-        break;
-        case model_t.BGS_S:
-        scoreFunc = new BGS_S_Score(spectrum);
+        case model_t.REDUCED_NE_WITHS:
+        scoreFunc = new ReducedNe_withS_Score(spectrum);
         break;
         case model_t.MIXED:
-        scoreFunc = new MixedScore(spectrum, theta * lambda, nu * lambda, tau / lambda);
+        scoreFunc = new MixedScore(spectrum, theta, nu, tau);
         break;
         case model_t.MIXED_SIMPLE:
-        scoreFunc = new MixedSimpleScore(spectrum, theta * lambda, nu * lambda, tau / lambda);
+        scoreFunc = new MixedSimpleScore(spectrum, theta, nu, tau);
         break;
     }
     return scoreFunc;
@@ -184,7 +163,6 @@ double[] findMinimum(SingleSpectrumScore scoreFunc) {
     
     auto powell = new Powell!SingleSpectrumScore(scoreFunc);
     auto xInitial = scoreFunc.initialParams();
-    // return xInitial;
     powell.init(xInitial);
     
     double[] x;
@@ -209,15 +187,11 @@ double[string] getNamedParams(SingleSpectrumScore scoreFunc, double[] x) {
     
     // the internals of this software use a different parameterization, using 2N, not 2N_0 as the scaling factor. Also there is a bit different usage of cn, cw and ca (see modelScores.d). That's why we scale everything to match the notation in the preprint (Schiffels, Mustonen, Laessig, 2014)
     double[string] ret;
-    if(model == model_t.UNLINKED)
-      tau = p["t"];
-    auto lambda = tau / t;
     ret["tau"] = tau;
     ret["score"] = score;
-    ret["theta"] = mu / lambda;
-    ret["nu"] = V / lambda;
-    ret["lambda"] = lambda;
-    ret["sigma"] = s / lambda;
+    ret["theta"] = mu;
+    ret["nu"] = V;
+    ret["sigma"] = s;
     ret["cn"] = c;
     ret["cw"] = (1.0 - c) * cw;
     ret["ca"] = (1.0 - c) * (1.0 - cw) * 2.0 * gamma * t;
@@ -265,29 +239,9 @@ void writeParamsWithBootstrap(in double[string] p, in Accumulator accumulator) {
     }
 }
 
-// ulong[] getBootstrap(in ulong[] spectrum) {
-//     auto norm = spectrum.reduce!"a+b"();
-//     stderr.writef("bootstrapping from %s data points...", norm);
-//     auto ret = new ulong[spectrum.length];
-//     foreach(i; 0 .. norm) {
-//         auto k = dice(spectrum);
-//         ret[k] += 1;
-//     }
-//     stderr.writeln("done");
-//     return ret;
-// }
-//
-
 void writeSpectrum(string spectrumFile, SingleSpectrumScore scoreFunc, double[] xMin) {
   
     auto p = scoreFunc.makeSingleSpectrumParams(xMin);
-    // p["t"] = tau / pMin["lambda"];
-    // p["mu"] = pMin["theta"] * pMin["lambda"];
-    // p["V"] = pMin["nu"] * pMin["lambda"];
-    // p["s"] = pMin["sigma"] * pMin["lambda"];
-    // p["c"] = pMin["cn"];
-    // p["cw"] = pMin["cw"] > 0.0 ? pMin["cw"] / (1.0 - p["c"]) : 0.0;
-    // p["gamma"] = pMin["ca"] > 0.0 ? pMin["ca"] / ((1.0 - p["c"]) * (1.0 - p["cw"]) * 2.0 * p["t"]) : 0.0;
 
     auto spectrum = scoreFunc.getSingleSpectrumProbs(p);
     auto f = File(spectrumFile, "w");
