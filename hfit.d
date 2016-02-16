@@ -185,9 +185,9 @@ double[string] getNamedParams(SingleSpectrumScore scoreFunc, double[] x) {
     auto c = p["c"];
     auto cw = p["cw"];
     
-    // the internals of this software use a different parameterization, using 2N, not 2N_0 as the scaling factor. Also there is a bit different usage of cn, cw and ca (see modelScores.d). That's why we scale everything to match the notation in the preprint (Schiffels, Mustonen, Laessig, 2014)
+    // Rename things so that they match the paper (Schiffels, Mustonen, Laessig, 2014)
     double[string] ret;
-    ret["tau"] = tau;
+    ret["tau"] = t;
     ret["score"] = score;
     ret["theta"] = mu;
     ret["nu"] = V;
