@@ -20,8 +20,9 @@ class SingleSpectrumScore {
   ulong m;
   ulong norm;
   ubyte nrParams;
+  int minAc;
   
-  this(in ulong[] spectrumData, ubyte nrParams) {
+  this(in ulong[] spectrumData, ubyte nrParams, int minAc=1) {
     enforce(spectrumData.length > 0, "need non-empty data");
     m = spectrumData.length - 1;
     neutralSpectrumProbFunc = new SingleSpectrumProb(cast(int)m);
@@ -29,6 +30,7 @@ class SingleSpectrumScore {
     norm = reduce!"a+b"(spectrumData.dup);
     this.spectrumData = spectrumData;
     this.nrParams = nrParams;
+    this.minAc = minAc;
   }
   
   abstract double[string] makeSingleSpectrumParams(in double[] x);
@@ -78,9 +80,15 @@ class SingleSpectrumScore {
   double getScore(double[string] p) {
     auto probs = getSingleSpectrumProbs(p);
     auto score = 0.0;
-    foreach(k; 0 .. m + 1) {
+    auto norm = spectrumData.reduce!"a+b"();
+    auto probTotal = 0.0;
+    auto countTotal = 0;
+    foreach(k; minAc .. m + 1) {
       score += -log(probs[k]) * spectrumData[k];
+      probTotal += probs[k];
+      countTotal += spectrumData[k];
     }
+    score += -log(1.0 - probTotal) * (norm - countTotal);
     return score;
   }
   
@@ -110,8 +118,8 @@ class SingleSpectrumScore {
 
 class FullScore : SingleSpectrumScore {
   
-  this(in ulong[] spectrum) {
-    super(spectrum, 7);
+  this(in ulong[] spectrum, int minAc=1) {
+    super(spectrum, 7, minAc);
   }
   
   override double[string] makeSingleSpectrumParams(in double[] x) {
@@ -165,8 +173,8 @@ class FullScore : SingleSpectrumScore {
 
 class LinkedSelection_withS_Score : SingleSpectrumScore {
 
-  this(in ulong[] spectrum) {
-    super(spectrum, 4);
+  this(in ulong[] spectrum, int minAc=1) {
+    super(spectrum, 4, minAc);
   }
   
   override double[string] makeSingleSpectrumParams(in double[] x) {
@@ -205,8 +213,8 @@ class LinkedSelection_withS_Score : SingleSpectrumScore {
 
 class LinkedSelection_Score : SingleSpectrumScore {
 
-  this(in ulong[] spectrum) {
-    super(spectrum, 3);
+  this(in ulong[] spectrum, int minAc=1) {
+    super(spectrum, 3, minAc);
   }
   
   override double[string] makeSingleSpectrumParams(in double[] x) {
@@ -241,8 +249,8 @@ class LinkedSelection_Score : SingleSpectrumScore {
 
 class ReducedNe_withS_Score : SingleSpectrumScore {
   
-  this(in ulong[] spectrum) {
-    super(spectrum, 3);
+  this(in ulong[] spectrum, int minAc=1) {
+    super(spectrum, 3, minAc);
   }
   
   override double[string] makeSingleSpectrumParams(in double[] x) {
@@ -278,8 +286,8 @@ class ReducedNe_withS_Score : SingleSpectrumScore {
 
 class ReducedNe_Score : SingleSpectrumScore {
   
-  this(in ulong[] spectrum) {
-    super(spectrum, 2);
+  this(in ulong[] spectrum, int minAc=1) {
+    super(spectrum, 2, minAc);
   }
   
   override double[string] makeSingleSpectrumParams(in double[] x) {
@@ -314,8 +322,8 @@ class MixedScore : SingleSpectrumScore {
   
   double mu, V, t;
   
-  this(in ulong[] spectrum, double mu, double V, double t) {
-    super(spectrum, 4);
+  this(in ulong[] spectrum, double mu, double V, double t, int minAc=1) {
+    super(spectrum, 4, minAc);
     this.mu = mu;
     this.V = V;
     this.t = t;
@@ -370,8 +378,8 @@ class MixedSimpleScore : SingleSpectrumScore {
   
   double mu, V, t;
   
-  this(in ulong[] spectrum, double mu, double V, double t) {
-    super(spectrum, 2);
+  this(in ulong[] spectrum, double mu, double V, double t, int minAc=1) {
+    super(spectrum, 2, minAc);
     this.mu = mu;
     this.V = V;
     this.t = t;

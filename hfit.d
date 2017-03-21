@@ -26,6 +26,7 @@ ulong[] spectrum;
 bool noMCMC;
 auto nrMCMCcycles = 1000;
 string mcmcTraceFile = "/dev/null";
+int minAc=1;
 
 void main(string[] args) {
   
@@ -53,7 +54,8 @@ void readCommandlineParams(string[] args) {
            "noMCMC", &noMCMC,
            "nrMCMCcycles|n", &nrMCMCcycles,
            "mcmcTraceFile", &mcmcTraceFile,
-           "inputData|i", &inputData);
+           "inputData|i", &inputData,
+           "minAc", &minAc);
    
     if(inputData.length > 0)
         spectrum = inputData.split(",").map!"a.to!ulong()"().array();
@@ -102,6 +104,7 @@ void displayHelpMessage() {
         --theta                             input for fixed model parameters
         --nu                                input for fixed model parameters
         --mcmcTraceFile                     file to write MCMC trace to
+        --minAc                             minimum allele count to fit (default=1).
 
         The output of the program contains columns with model estimates. The first column is the name of the parameter. The second column is the maximum likelihood estimate. The third column is the standard deviation for the parameter, obtained from boostrapping (omitted if --noMCMC is given)\n");
 }
@@ -138,22 +141,22 @@ SingleSpectrumScore getScoreFunc(ulong[] spectrum, model_t model) {
     SingleSpectrumScore scoreFunc;
     final switch(model) {
         case model_t.LINKED_SELECTION:
-        scoreFunc = new LinkedSelection_Score(spectrum);
+        scoreFunc = new LinkedSelection_Score(spectrum, minAc);
         break;
         case model_t.LINKED_SELECTION_WITHS:
-        scoreFunc = new LinkedSelection_withS_Score(spectrum);
+        scoreFunc = new LinkedSelection_withS_Score(spectrum, minAc);
         break;
         case model_t.REDUCED_NE:
-        scoreFunc = new ReducedNe_Score(spectrum);
+        scoreFunc = new ReducedNe_Score(spectrum, minAc);
         break;
         case model_t.REDUCED_NE_WITHS:
-        scoreFunc = new ReducedNe_withS_Score(spectrum);
+        scoreFunc = new ReducedNe_withS_Score(spectrum, minAc);
         break;
         case model_t.MIXED:
-        scoreFunc = new MixedScore(spectrum, theta, nu, tau);
+        scoreFunc = new MixedScore(spectrum, theta, nu, tau, minAc);
         break;
         case model_t.MIXED_SIMPLE:
-        scoreFunc = new MixedSimpleScore(spectrum, theta, nu, tau);
+        scoreFunc = new MixedSimpleScore(spectrum, theta, nu, tau, minAc);
         break;
     }
     return scoreFunc;
